@@ -23,8 +23,10 @@ jobs:
 
       - name: Run RSS parser
         run: |
-          echo "Запуск rss_parser.py..."
-          python rss_parser.py || echo "Ошибка при запуске скрипта"
+          echo "=== Запускаю скрипт ==="
+          python rss_parser.py
+          echo "=== Скрипт завершён ==="
+          ls -la
 
       - name: Commit and push updated RSS
         run: |
