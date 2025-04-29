@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 
 BASE_URL = 'https://cfts.org.ua'
 
+# Получение статей с одного раздела
 def get_articles(section_url):
     headers = {'User-Agent': 'Mozilla/5.0'}
     response = requests.get(section_url, headers=headers)
@@ -13,15 +14,16 @@ def get_articles(section_url):
     articles = []
     now = datetime.datetime.now()
 
-    for block in soup.select('div.news_block'):
-        title_tag = block.select_one('div.news_title > a')
-        date_tag = block.select_one('div.news_date')
+    for item in soup.select('ul.news_list li'):
+        title_tag = item.select_one('div.title > a')
+        date_tag = item.select_one('div.date')
 
         if not title_tag or not date_tag:
             continue
 
         title = title_tag.get_text(strip=True)
         link = BASE_URL + title_tag['href']
+
         try:
             pub_date = datetime.datetime.strptime(date_tag.text.strip(), '%d.%m.%Y %H:%M')
         except ValueError:
@@ -32,6 +34,7 @@ def get_articles(section_url):
 
     return articles
 
+# Генерация RSS-файла
 def generate_rss(articles, filename):
     rss = ET.Element('rss', version='2.0')
     channel = ET.SubElement(rss, 'channel')
@@ -50,18 +53,19 @@ def generate_rss(articles, filename):
     tree = ET.ElementTree(rss)
     tree.write(filename, encoding='utf-8', xml_declaration=True)
 
+# Основной процесс
 def main():
-    sections = [
+    urls = [
         'https://cfts.org.ua/news/',
         'https://cfts.org.ua/articles/',
         'https://cfts.org.ua/analytics/',
     ]
 
     all_articles = []
-    for url in sections:
+    for url in urls:
         all_articles.extend(get_articles(url))
 
     generate_rss(all_articles, 'rss.xml')
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
