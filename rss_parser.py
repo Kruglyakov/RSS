@@ -1,71 +1,82 @@
 import requests
 from bs4 import BeautifulSoup
-import datetime
-import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta
+import time
 
-BASE_URL = 'https://cfts.org.ua'
+BASE_URL = "https://cfts.org.ua"
+SECTIONS = {
+    "news": "/news",
+    "articles": "/articles",
+    "intervju": "/intervju",
+    "mnenija": "/mnenija"
+}
 
-# Получение статей с одного раздела
-def get_articles(section_url):
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    response = requests.get(section_url, headers=headers)
-    soup = BeautifulSoup(response.text, 'html.parser')
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
 
-    articles = []
-    now = datetime.datetime.now()
+MAX_PAGES = 10  # можно увеличить, если нужно глубже
+DAYS_LIMIT = 30
 
-    for item in soup.select('ul.news_list li'):
-        title_tag = item.select_one('div.title > a')
-        date_tag = item.select_one('div.date')
+def parse_date(date_str):
+    """Парсинг даты из текстовой строки"""
+    try:
+        return datetime.fromisoformat(date_str)
+    except Exception:
+        return None
 
-        if not title_tag or not date_tag:
-            continue
+def fetch_section_items(section_url):
+    results = []
+    cutoff_date = datetime.now() - timedelta(days=DAYS_LIMIT)
+    
+    for page in range(1, MAX_PAGES + 1):
+        url = f"{BASE_URL}{section_url}/stranica-{page}" if page > 1 else f"{BASE_URL}{section_url}"
+        response = requests.get(url, headers=HEADERS)
+        if response.status_code != 200:
+            print(f"Не удалось загрузить {url}")
+            break
 
-        title = title_tag.get_text(strip=True)
-        link = BASE_URL + title_tag['href']
+        soup = BeautifulSoup(response.text, "html.parser")
+        items = soup.select("div.item.story")
 
-        try:
-            pub_date = datetime.datetime.strptime(date_tag.text.strip(), '%d.%m.%Y %H:%M')
-        except ValueError:
-            continue
+        stop = False
+        for item in items:
+            a_tag = item.find("a", href=True)
+            title_tag = item.find("span", class_="title")
+            time_tag = item.find("time", attrs={"datetime": True})
+            if not (a_tag and title_tag and time_tag):
+                continue
 
-        if now - pub_date <= datetime.timedelta(days=30):
-            articles.append({'title': title, 'link': link, 'pub_date': pub_date})
+            title = title_tag.get_text(strip=True)
+            link = BASE_URL + a_tag["href"]
+            pub_date = parse_date(time_tag["datetime"])
+            if not pub_date:
+                continue
 
-    return articles
+            if pub_date < cutoff_date:
+                stop = True
+                break
 
-# Генерация RSS-файла
-def generate_rss(articles, filename):
-    rss = ET.Element('rss', version='2.0')
-    channel = ET.SubElement(rss, 'channel')
+            results.append({
+                "title": title,
+                "link": link,
+                "date": pub_date.strftime("%Y-%m-%d")
+            })
 
-    ET.SubElement(channel, 'title').text = 'CFTS.org.ua — Новости, Статьи, Аналитика'
-    ET.SubElement(channel, 'link').text = BASE_URL
-    ET.SubElement(channel, 'description').text = 'Последние новости, статьи и аналитика'
-    ET.SubElement(channel, 'language').text = 'ru'
+        if stop or not items:
+            break
 
-    for article in sorted(articles, key=lambda x: x['pub_date'], reverse=True):
-        item = ET.SubElement(channel, 'item')
-        ET.SubElement(item, 'title').text = article['title']
-        ET.SubElement(item, 'link').text = article['link']
-        ET.SubElement(item, 'pubDate').text = article['pub_date'].strftime('%a, %d %b %Y %H:%M:%S +0000')
+        time.sleep(1)  # вежливая пауза
 
-    tree = ET.ElementTree(rss)
-    tree.write(filename, encoding='utf-8', xml_declaration=True)
+    return results
 
-# Основной процесс
-def main():
-    urls = [
-        'https://cfts.org.ua/news/',
-        'https://cfts.org.ua/articles/',
-        'https://cfts.org.ua/analytics/',
-    ]
+# Собираем материалы по всем разделам
+all_items = []
+for name, path in SECTIONS.items():
+    print(f"Обработка раздела: {name}")
+    section_items = fetch_section_items(path)
+    all_items.extend(section_items)
 
-    all_articles = []
-    for url in urls:
-        all_articles.extend(get_articles(url))
-
-    generate_rss(all_articles, 'rss.xml')
-
-if __name__ == '__main__':
-    main()
+# Пример вывода
+for item in all_items:
+    print(f"{item['date']}: {item['title']} — {item['link']}")
