@@ -5,7 +5,7 @@ import time
 
 BASE_URL = "https://cfts.org.ua"
 SECTIONS = {
-    "news": "/news",
+    "news": "/novosti",
     "articles": "/articles",
     "intervju": "/intervju",
     "mnenija": "/mnenija"
