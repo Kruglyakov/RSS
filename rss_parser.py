@@ -15,6 +15,24 @@ def parse_date_iso(date_str):
     except Exception:
         return None
 
+def parse_date_ain(date_str):
+    today = datetime.now()
+
+    # Если строка содержит только время (например, "09:45")
+    try:
+        if len(date_str) < 6:  # Дата в формате "09:45"
+            return today.replace(hour=int(date_str[:2]), minute=int(date_str[3:5]), second=0, microsecond=0)
+        
+        # Если строка содержит дату, например "28 кві"
+        if 'кві' in date_str:
+            day = int(date_str.split()[0])  # Извлекаем день
+            return today.replace(day=day, hour=0, minute=0, second=0, microsecond=0)
+        
+        # Полный формат даты, например "2025-04-28"
+        return datetime.strptime(date_str, "%Y-%m-%d")
+    except Exception:
+        return None
+
 def fetch_cfts_items():
     BASE_URL = "https://cfts.org.ua"
     SECTIONS = {
@@ -98,14 +116,10 @@ def fetch_ain_items():
             link = BASE_URL + link_tag["href"]
             time_text = time_tag.get_text(strip=True)
 
-            today = datetime.now().strftime("%Y-%m-%d")
-            try:
-                pub_date = datetime.strptime(f"{today} {time_text}", "%Y-%m-%d %H:%M")
-            except Exception:
-                continue
-
-            if pub_date < cutoff_date:
-                return results
+            # Обработка даты
+            pub_date = parse_date_ain(time_text)
+            if not pub_date or pub_date < cutoff_date:
+                continue  # Пропускаем новость, если она старше 30 дней
 
             results.append({
                 "title": title,
