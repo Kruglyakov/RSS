@@ -60,3 +60,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+if __name__ == "__main__":
+    print("Запуск парсинга...")
+    main()
+    print("Готово. Файл rss.xml должен быть создан.")
