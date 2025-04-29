@@ -19,9 +19,10 @@ MAX_PAGES = 10  # можно увеличить, если нужно глубж�
 DAYS_LIMIT = 30
 
 def parse_date(date_str):
-    """Парсинг даты из текстовой строки"""
+    """Парсинг даты без учёта часового пояса"""
     try:
-        return datetime.fromisoformat(date_str)
+        dt = datetime.fromisoformat(date_str)
+        return dt.replace(tzinfo=None)  # убираем информацию о часовом поясе
     except Exception:
         return None
 
