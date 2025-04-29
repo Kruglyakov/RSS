@@ -3,65 +3,65 @@ from bs4 import BeautifulSoup
 import datetime
 import xml.etree.ElementTree as ET
 
-# Функция для получения данных с сайта
-def get_articles(url):
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    articles = []
+BASE_URL = 'https://cfts.org.ua'
 
-    # Ищем все элементы с новыми статьями
-    for item in soup.find_all('article'):
-        title = item.find('h2').get_text(strip=True)
-        link = item.find('a')['href']
-        pub_date = item.find('time')['datetime']
-        
-        # Конвертируем строку в дату
-        pub_date = datetime.datetime.fromisoformat(pub_date)
-        if pub_date > datetime.datetime.now() - datetime.timedelta(days=30):
+def get_articles(section_url):
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    response = requests.get(section_url, headers=headers)
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    articles = []
+    now = datetime.datetime.now()
+
+    for block in soup.select('div.news_block'):
+        title_tag = block.select_one('div.news_title > a')
+        date_tag = block.select_one('div.news_date')
+
+        if not title_tag or not date_tag:
+            continue
+
+        title = title_tag.get_text(strip=True)
+        link = BASE_URL + title_tag['href']
+        try:
+            pub_date = datetime.datetime.strptime(date_tag.text.strip(), '%d.%m.%Y %H:%M')
+        except ValueError:
+            continue
+
+        if now - pub_date <= datetime.timedelta(days=30):
             articles.append({'title': title, 'link': link, 'pub_date': pub_date})
 
     return articles
 
-# Генерация RSS
 def generate_rss(articles, filename):
     rss = ET.Element('rss', version='2.0')
     channel = ET.SubElement(rss, 'channel')
 
     ET.SubElement(channel, 'title').text = 'CFTS.org.ua — Новости, Статьи, Аналитика'
-    ET.SubElement(channel, 'link').text = 'https://cfts.org.ua/'
+    ET.SubElement(channel, 'link').text = BASE_URL
     ET.SubElement(channel, 'description').text = 'Последние новости, статьи и аналитика'
     ET.SubElement(channel, 'language').text = 'ru'
 
-    for article in articles:
+    for article in sorted(articles, key=lambda x: x['pub_date'], reverse=True):
         item = ET.SubElement(channel, 'item')
         ET.SubElement(item, 'title').text = article['title']
         ET.SubElement(item, 'link').text = article['link']
         ET.SubElement(item, 'pubDate').text = article['pub_date'].strftime('%a, %d %b %Y %H:%M:%S +0000')
 
     tree = ET.ElementTree(rss)
-    tree.write(filename)
+    tree.write(filename, encoding='utf-8', xml_declaration=True)
 
-# Основной процесс
 def main():
-    urls = [
+    sections = [
         'https://cfts.org.ua/news/',
         'https://cfts.org.ua/articles/',
-        'https://cfts.org.ua/analytics/'
+        'https://cfts.org.ua/analytics/',
     ]
-    
+
     all_articles = []
-    
-    for url in urls:
-        articles = get_articles(url)
-        all_articles.extend(articles)
+    for url in sections:
+        all_articles.extend(get_articles(url))
 
     generate_rss(all_articles, 'rss.xml')
 
 if __name__ == "__main__":
     main()
-
-if __name__ == "__main__":
-    print("Запуск парсинга...")
-    main()
-    print("Готово. Файл rss.xml должен быть создан.")
