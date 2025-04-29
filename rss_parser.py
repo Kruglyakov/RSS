@@ -79,6 +79,11 @@ def fetch_ain_items():
             break
 
         soup = BeautifulSoup(response.text, "html.parser")
+
+        # Удаляем блоки "Не пропустіть"
+        for section in soup.select("section.top-news-swiper-wrapper"):
+            section.decompose()
+
         articles = soup.select("article.widget")
 
         for article in articles:
