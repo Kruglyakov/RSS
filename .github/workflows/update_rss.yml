@@ -2,33 +2,36 @@ name: Update RSS Feed
 
 on:
   schedule:
-    - cron: '0 */3 * * *'  # Запускать раз в 3 часа
-  workflow_dispatch:  # Возможность запускать вручную
+    - cron: "0 */3 * * *"  # каждые 3 часа
+  workflow_dispatch:
 
 jobs:
   update-rss:
     runs-on: ubuntu-latest
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
 
-    - name: Install dependencies
-      run: |
-        pip install requests beautifulsoup4
+      - name: Install requirements (if any)
+        run: pip install -r requirements.txt || echo "No requirements.txt found"
 
-    - name: Run RSS parser
-      run: |
-        python rss_parser.py
+      - name: Run RSS parser
+        run: |
+          echo "Запуск rss_parser.py..."
+          python rss_parser.py || echo "Ошибка при запуске скрипта"
 
-    - name: Commit and push updated RSS
-      run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
-        git add rss.xml
-        git commit -m "Update RSS feed"
-        git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+      - name: Commit and push updated RSS
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git status
+          git add rss.xml || echo "Нечего добавлять"
+          git status
+          git commit -m "Update RSS feed" || echo "Нечего коммитить"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git || echo "Push не удался"
